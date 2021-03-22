@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 //help us with retreiving data from the url
 import queryString from 'query-string';
 import io from 'socket.io-client';
+
+import InfoBar from '../InfoBar/InfoBar'
+import Input from '../Input/Input'
+import Messages from '../Messages/Messages'
+import TextContainer from '../TextContainer/TextContainer'
 import './Chat.css';
 
 let socket;//define variable
@@ -18,6 +23,7 @@ const Chat = ({ location }) => {
     const [room, setRoom] = useState('');
     //then spcifiy state for set message and message which is an empty string
     const [message, setMessage] = useState('');
+    const [users, setUsers] = useState('') 
     //kep track of messages using state, inside messages we will have an array that stores all messages
     const [messages, setMessages] = useState([]);
     const ENDPOINT = 'localhost:5000';
@@ -27,7 +33,9 @@ const Chat = ({ location }) => {
     useEffect(() => {
         const { name, room } = queryString.parse(location.search);
         //set connection and pas endpoint to server (localhost5000)
-        socket = io(ENDPOINT);
+        //changing
+        //socket = io(ENDPOINT);
+        socket = io(ENDPOINT , {transports: ['websocket', 'polling', 'flashsocket']});
         
         //we can emit different events using this specfic instance of a socket
         setName(name);
@@ -51,7 +59,7 @@ const Chat = ({ location }) => {
        //on backend (index.js we had disconnect event on socket.on). happens on unmounting of 
        //components when we leave the chat
         socket.emit('join', { name, room }, () => {
-
+            
         }); 
         return () => {
             socket.emit('disconnect');
@@ -73,7 +81,12 @@ const Chat = ({ location }) => {
             //we cant mutate state so we spread all other messages and add one message on it
             
             setMessages([...messages, message]);
-        })
+        });
+
+        socket.on('roomData', ({ users }) => {
+            setUsers(users);
+        });
+
         //we want run use effect wheneber messages array changes
     }, [messages]);
 
@@ -96,13 +109,17 @@ const Chat = ({ location }) => {
     return (
         <div className='outerContainer'>
             <div className='container'>
-            
+            <InfoBar room={room}/>
+            <Messages messages={messages} name={name} />
+            <Input message={message} setMessage={setMessage} sendMessage={sendMessage}/>
             {/*<input 
             value={message} 
             onChange = {(event) => setMessage(event.target.value)}
             onKeyPress = {event => event.key === 'Enter' ? sendMessage(event) : null}
             />*/}
             </div>
+            {/*display the number of people that are online in one room-loop through them*/}
+            <TextContainer users={users} />
         </div>
     )
 }

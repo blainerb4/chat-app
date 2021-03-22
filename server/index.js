@@ -1,8 +1,11 @@
 //no import statements cos we are in node
 const express = require('express');
 const socketio = require('socket.io'); //has methods this is the backend, frontend is socket.io-client
+//io is an instance of socketio-need to declare instance of io
+const cors = require ('cors');
 //built in node module http
 const http = require('http');
+
 
 const { addUser, removeUser, getUser, getUsersInRoom } = require('./users.js');
 
@@ -22,8 +25,25 @@ const app = express();
 
 const server = http.createServer(app);
 
-//io is an instance of socketio-need to declare instance of io
-const io = socketio(server);
+//changing
+//const io = socketio(server);
+const io = socketio (server, {
+    cors: {
+        origin: '*',
+        methods: ["GET", "POST"],
+        credentials: true
+    }
+});
+
+
+//corsOptions={
+//    cors: true,
+//    origins:["http://localhost:3000"],
+ //  }
+
+//call router as a middleware
+app.use(router);
+
 
 //io.on (built in keyword connection) will run when we have a client connection on our io instance
 //socket.on we have a built in disconnect when a user disconnects from our io instance
@@ -67,6 +87,9 @@ io.on('connection', (socket) => {
         //name of room stored in user.room and we get it out of user
         socket.join(user.room);
 
+        //find out what users are in the room
+        io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room)});
+
         //callback at the frontend gets called everytime if no error we wont pass error
         callback();
     });
@@ -81,17 +104,24 @@ io.on('connection', (socket) => {
         const user = getUser(socket.id);
         //message coming from front end
         io.to(user.room).emit('message', { user: user.name, text: message });
+        //when user leaves send message to room data, we need new state of users in the room
+        io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room) });
+
         //do something after message sent on the frontend
         callback();
     });
     
     socket.on('disconnect', () => {
-        console.log('user has left.');
+ //       console.log('user has left.');
+        const user = removeUser(socket.id);
+
+        if(user){
+            io.to(user.room).emit('message', { user: 'admin', text: `${user.name} has left.`})
+        }
     })
 });
 
-//call router as a middleware
-app.use(router);
+
 
 server.listen(PORT, () => console.log(`server has started on port ${PORT}`));
 
